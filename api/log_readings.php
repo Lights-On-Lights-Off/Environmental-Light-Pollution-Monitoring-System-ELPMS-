@@ -1,6 +1,7 @@
 <?php
 // Receives a JSON batch of sensor readings from main.js and saves them to light_logs.
-// Called automatically by the frontend once per minute.
+// Also updates the buildings table so all other pages reflect the latest levels.
+// Called automatically by the frontend every 60 seconds.
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/config.php';
@@ -21,21 +22,41 @@ if (empty($body['entries']) || !is_array($body['entries'])) {
     exit;
 }
 
-// Insert all entries in a single prepared statement loop
-$stmt = $pdo->prepare(
+$insertLog = $pdo->prepare(
     "INSERT INTO light_logs (building_id, lux, pollution_level, online) VALUES (?, ?, ?, ?)"
 );
+
+// Also update the buildings table so manager and other pages see current levels
+$updateBuilding = $pdo->prepare(
+    "UPDATE buildings SET lux = ?, pollution_level = ?, online = ? WHERE id = ?"
+);
+
+// Keep only the latest entry per building for the buildings table update
+$latest = [];
+foreach ($body['entries'] as $entry) {
+    $latest[(int)$entry['building_id']] = $entry;
+}
 
 $pdo->beginTransaction();
 try {
     foreach ($body['entries'] as $entry) {
-        $stmt->execute([
+        $insertLog->execute([
             (int)$entry['building_id'],
             (float)$entry['lux'],
             $entry['pollution_level'],
             (int)$entry['online'],
         ]);
     }
+
+    foreach ($latest as $id => $entry) {
+        $updateBuilding->execute([
+            (float)$entry['lux'],
+            $entry['pollution_level'],
+            (int)$entry['online'],
+            $id,
+        ]);
+    }
+
     $pdo->commit();
     echo json_encode(['success' => true, 'saved' => count($body['entries'])]);
 } catch (PDOException $e) {
