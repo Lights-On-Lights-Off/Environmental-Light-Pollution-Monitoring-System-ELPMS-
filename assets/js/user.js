@@ -5,7 +5,29 @@ const POLLUTION_COLORS = { low: '#22c55e', moderate: '#f59e0b', high: '#ef4444' 
 const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
 let userMap    = null;
-let mapMarkers = [];
+let mapMarkers = {};
+
+// Local working copy of building data, updated on each simulation tick
+const buildings = BUILDINGS_DATA.map(b => ({ ...b }));
+
+function getLevelFromLux(lux) {
+    if (lux < 30) return 'low';
+    if (lux < 80) return 'moderate';
+    return 'high';
+}
+
+function buildUserPopup(b) {
+    const color = POLLUTION_COLORS[b.pollutionLevel];
+    return `
+        <div style="font-family:'Outfit',sans-serif;min-width:170px;">
+            <div style="font-weight:700;font-size:0.92rem;margin-bottom:6px;">${b.name}</div>
+            <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600;background:${color}33;color:${color};border:1px solid ${color}66;">
+                ${cap(b.pollutionLevel)}
+            </span>
+            <div style="font-size:0.78rem;color:#777;margin-top:4px;">${b.description}</div>
+            <div style="font-size:0.75rem;color:#aaa;margin-top:4px;">Lux: ${typeof b.lux === 'number' ? b.lux.toFixed(1) : b.lux}</div>
+        </div>`;
+}
 
 function initUserMap() {
     if (userMap) return;
@@ -28,32 +50,93 @@ function initUserMap() {
         .addTo(userMap)
         .bindPopup('Northern Bukidnon State College');
 
-    renderMapMarkers('all');
+    // Place initial markers keyed by building id
+    buildings.forEach(b => {
+        const color  = POLLUTION_COLORS[b.pollutionLevel];
+        const marker = L.circleMarker(b.coordinates, {
+            radius: 10, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.9,
+        }).addTo(userMap);
+        marker.bindPopup(buildUserPopup(b));
+        mapMarkers[b.id] = marker;
+    });
+
+    // Sync immediately from DB on load, then every 30 seconds
+    syncFromDatabase();
+    setInterval(syncFromDatabase, 30000);
 }
 
-function renderMapMarkers(filter) {
-    mapMarkers.forEach(m => userMap.removeLayer(m));
-    mapMarkers = [];
+// Fetches the latest reading per building from the DB and updates all markers.
+// Falls back to local random simulation if the DB has no entries yet.
+async function syncFromDatabase() {
+    try {
+        const res  = await fetch(API('api/latest_readings.php'));
+        const data = await res.json();
 
-    BUILDINGS_DATA
-        .filter(b => filter === 'all' || b.pollutionLevel === filter)
-        .forEach(b => {
-            const color  = POLLUTION_COLORS[b.pollutionLevel];
-            const marker = L.circleMarker(b.coordinates, {
-                radius: 10, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.9,
-            }).addTo(userMap);
+        if (data.success && data.readings.length > 0) {
+            const filter = document.getElementById('user-map-filter')?.value || 'all';
 
-            marker.bindPopup(`
-                <div style="font-family:'Outfit',sans-serif;min-width:170px;">
-                    <div style="font-weight:700;font-size:0.92rem;margin-bottom:6px;">${b.name}</div>
-                    <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600;background:${color}33;color:${color};border:1px solid ${color}66;">
-                        ${cap(b.pollutionLevel)}
-                    </span>
-                    <div style="font-size:0.78rem;color:#777;margin-top:4px;">${b.description}</div>
-                </div>`);
+            data.readings.forEach(row => {
+                const b = buildings.find(x => x.id === parseInt(row.building_id));
+                if (!b) return;
 
-            mapMarkers.push(marker);
-        });
+                b.lux            = parseFloat(row.lux);
+                b.pollutionLevel = row.pollution_level;
+                b.online         = !!parseInt(row.online);
+
+                const marker = mapMarkers[b.id];
+                if (!marker) return;
+
+                marker.setStyle({ fillColor: POLLUTION_COLORS[b.pollutionLevel] });
+                marker.setPopupContent(buildUserPopup(b));
+
+                if (filter === 'all' || b.pollutionLevel === filter) {
+                    if (!userMap.hasLayer(marker)) marker.addTo(userMap);
+                } else {
+                    if (userMap.hasLayer(marker)) userMap.removeLayer(marker);
+                }
+            });
+        } else {
+            // No DB data yet — run local simulation so the map still shows live-looking data
+            runLocalSimulation();
+        }
+    } catch (e) {
+        // Network error — fall back to local simulation
+        runLocalSimulation();
+    }
+}
+
+// Local fallback simulation used only when the DB has no readings yet
+function runLocalSimulation() {
+    const filter = document.getElementById('user-map-filter')?.value || 'all';
+
+    buildings.forEach(b => {
+        b.lux            = Math.min(150, Math.max(5, b.lux + (Math.random() - 0.5) * 15));
+        b.pollutionLevel = getLevelFromLux(b.lux);
+
+        const marker = mapMarkers[b.id];
+        if (!marker) return;
+
+        marker.setStyle({ fillColor: POLLUTION_COLORS[b.pollutionLevel] });
+        marker.setPopupContent(buildUserPopup(b));
+
+        if (filter === 'all' || b.pollutionLevel === filter) {
+            if (!userMap.hasLayer(marker)) marker.addTo(userMap);
+        } else {
+            if (userMap.hasLayer(marker)) userMap.removeLayer(marker);
+        }
+    });
+}
+
+function applyMapFilter(filter) {
+    buildings.forEach(b => {
+        const marker = mapMarkers[b.id];
+        if (!marker) return;
+        if (filter === 'all' || b.pollutionLevel === filter) {
+            if (!userMap.hasLayer(marker)) marker.addTo(userMap);
+        } else {
+            if (userMap.hasLayer(marker)) userMap.removeLayer(marker);
+        }
+    });
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -67,8 +150,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
-document.getElementById('user-map-filter').addEventListener('change', e => renderMapMarkers(e.target.value));
-document.getElementById('refresh-user-map-btn').addEventListener('click', () => renderMapMarkers(document.getElementById('user-map-filter').value));
+document.getElementById('user-map-filter').addEventListener('change', e => applyMapFilter(e.target.value));
+document.getElementById('refresh-user-map-btn').addEventListener('click', async () => {
+    await syncFromDatabase();
+    applyMapFilter(document.getElementById('user-map-filter').value);
+});
 document.getElementById('reset-user-map-btn').addEventListener('click', () => userMap?.setView([8.359999, 124.868103], 18));
 
 const pill     = document.getElementById('userPillToggle');
@@ -143,7 +229,7 @@ async function downloadCSV(reqId, buildingId, location, startDate, endDate, data
     document.body.removeChild(a);
 }
 
-// Shared animated particle background used by all dashboard pages
+// Animated particle background
 (function () {
     const canvas = document.getElementById('bg-canvas');
     const ctx    = canvas.getContext('2d');
