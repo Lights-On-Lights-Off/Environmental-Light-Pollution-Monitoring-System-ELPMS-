@@ -3,7 +3,18 @@ require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
-$user = isLoggedIn() ? currentUser() : null;
+// Logged-in users who navigate to the landing page are sent to their dashboard
+if (isLoggedIn()) {
+    $dest = match($_SESSION['role']) {
+        'admin'   => url('admin/admin.php'),
+        'manager' => url('manager/manager.php'),
+        default   => url('user/user.php'),
+    };
+    header('Location: ' . $dest);
+    exit;
+}
+
+$user = null;
 
 // Load all buildings from the database for map markers and the log table
 $buildings = $pdo->query("SELECT * FROM buildings ORDER BY id ASC")->fetchAll();
