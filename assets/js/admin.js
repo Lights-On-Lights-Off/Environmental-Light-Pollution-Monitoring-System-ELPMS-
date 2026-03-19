@@ -5,7 +5,23 @@ let editingUserId = null;
 
 // Section navigation
 document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
-    btn.addEventListener('click', () => navigate(btn.dataset.section));
+    btn.addEventListener('click', () => {
+        navigate(btn.dataset.section);
+        // Close sidebar drawer on mobile after nav item is tapped
+        document.getElementById('adminSidebar')?.classList.remove('open');
+        document.getElementById('sidebarOverlay')?.classList.remove('open');
+    });
+});
+
+// Hamburger menu toggle for mobile
+document.getElementById('menuToggle')?.addEventListener('click', () => {
+    document.getElementById('adminSidebar')?.classList.toggle('open');
+    document.getElementById('sidebarOverlay')?.classList.toggle('open');
+});
+
+document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+    document.getElementById('adminSidebar')?.classList.remove('open');
+    document.getElementById('sidebarOverlay')?.classList.remove('open');
 });
 
 function navigate(section) {

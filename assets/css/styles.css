@@ -789,7 +789,7 @@ body.page-user { overflow-x: hidden; overflow-y: scroll; }
 body.page-manager,
 body.page-admin { overflow: hidden; }
 
-.shell { position: relative; z-index: 1; display: flex; height: 100vh; overflow: hidden; }
+.shell { position: relative; display: flex; height: 100vh; overflow: hidden; }
 
 .sidebar {
     width: var(--sidebar-w);
@@ -1187,7 +1187,7 @@ tbody tr:last-child td { border-bottom: none; }
     /* Manager / Admin shell */
     .menu-toggle  { display: flex; }
     .topbar-elpms { display: inline; }
-    .sidebar { position: fixed; left: -240px; z-index: 100; }
+    .sidebar { position: fixed; top: 0; left: -240px; z-index: 100; height: 100vh; }
     .sidebar.open { left: 0; }
     .topbar { padding: 0 14px; height: 56px; }
     #page-title { font-size: 1rem; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1250,4 +1250,13 @@ tbody tr:last-child td { border-bottom: none; }
     .kpi .value { font-size: 0.9rem; }
     .tab-btn span { display: none; }
     .stat-num { font-size: 1.1rem; }
+}
+
+/* On mobile, allow the fixed sidebar to escape the shell's overflow clipping.
+   Scoped to admin and manager only, and only below 768px. */
+@media (max-width: 768px) {
+    body.page-admin .shell,
+    body.page-manager .shell {
+        overflow: visible;
+    }
 }

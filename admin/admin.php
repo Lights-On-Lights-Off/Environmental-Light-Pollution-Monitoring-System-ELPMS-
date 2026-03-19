@@ -44,8 +44,10 @@ function timeAgo(string $dt): string {
 <body class="page-admin">
 <canvas id="bg-canvas"></canvas>
 
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
 <div class="shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="adminSidebar">
         <div class="sidebar-brand">
             <div class="brand-dot"></div>
             <div class="brand-texts"><h2>NBSC Admin</h2><p>System Administrator</p></div>
@@ -77,7 +79,11 @@ function timeAgo(string $dt): string {
 
     <main class="main">
         <div class="topbar">
-            <div><div id="page-title">Dashboard</div><div class="topbar-sub" id="topbar-sub">System overview</div></div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button class="menu-toggle" id="menuToggle">☰</button>
+                <span class="topbar-elpms">ELPMS</span>
+                <div><div id="page-title">Dashboard</div><div class="topbar-sub" id="topbar-sub">System overview</div></div>
+            </div>
             <div class="admin-pill">
                 <div class="admin-avatar">AD</div>
                 <span><?= htmlspecialchars($user['name']) ?></span>
