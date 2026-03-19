@@ -195,7 +195,8 @@ function initManagerMap() {
     L.control.layers({ 'Standard': std, 'Satellite': sat }, null, { position: 'bottomright' }).addTo(adminMap);
     adminMap.on('baselayerchange', e => adminMap.getContainer().classList.toggle('satellite-active', e.name === 'Satellite'));
 
-    renderManagerMarkers('all');
+    // Sync from DB immediately when the map section is opened so markers are current
+    syncBuildingLevels().then(() => renderManagerMarkers('all'));
 }
 
 function renderManagerMarkers(filter) {
@@ -258,3 +259,48 @@ document.getElementById('building-modal').addEventListener('click', e => { if (e
 
     loop();
 })();
+
+// Fetches the latest building levels from DB and updates building cards and map markers.
+// Runs every 30 seconds so the manager sees live pollution data without refreshing.
+async function syncBuildingLevels() {
+    try {
+        const res  = await fetch(API('api/latest_readings.php'));
+        const data = await res.json();
+        if (!data.success || !data.readings.length) return;
+
+        data.readings.forEach(row => {
+            const id    = parseInt(row.building_id);
+            const level = row.pollution_level;
+            const color = POLLUTION_COLORS[level];
+
+            // Update the local BUILDINGS array so map re-renders use fresh data
+            const b = BUILDINGS.find(x => x.id === id);
+            if (b) {
+                b.pollution_level = level;
+                b.lux = parseFloat(row.lux);
+            }
+
+            // Update the badge on the building card
+            const card  = document.getElementById('bcard-' + id);
+            if (card) {
+                const badge = card.querySelector('.badge');
+                if (badge) {
+                    badge.className  = 'badge ' + level;
+                    badge.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+                }
+                card.dataset.level = level;
+            }
+        });
+
+        // Re-render map markers if the map is open so colors update
+        if (adminMap) {
+            const currentFilter = document.getElementById('map-filter')?.value || 'all';
+            renderManagerMarkers(currentFilter);
+        }
+    } catch (e) {}
+}
+
+// Run once immediately on page load so data is current from the first render,
+// then keep syncing every 30 seconds
+syncBuildingLevels();
+setInterval(syncBuildingLevels, 30000);
