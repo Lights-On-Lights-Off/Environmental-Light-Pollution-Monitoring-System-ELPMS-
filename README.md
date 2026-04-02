@@ -1,4 +1,4 @@
-# 🌙 Environmental Light Pollution Monitoring System (ELPMS)
+# Environmental Light Pollution Monitoring System (ELPMS)
 
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
 ![Maintenance](https://img.shields.io/badge/maintenance-active-brightgreen)
