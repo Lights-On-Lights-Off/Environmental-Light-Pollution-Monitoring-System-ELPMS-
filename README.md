@@ -11,7 +11,7 @@
 All ongoing development, including new features, updates, and bug fixes, is handled in a separate repository:
 
 🔗 **Development Repository:**  
-https://github.com/Lights-On-Lights-Off/IAS-Environmental-Light-Pollution-Monitoring
+https://github.com/Lights-On-Lights-Off/IAS-Environmental-Light-Pollution-Monitoring-System.git
 
 This workflow is implemented to:
 - Reduce risks of errors in the main project
